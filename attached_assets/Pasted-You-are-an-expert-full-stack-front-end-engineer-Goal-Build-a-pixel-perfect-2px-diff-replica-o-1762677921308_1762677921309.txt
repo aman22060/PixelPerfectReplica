@@ -1,0 +1,441 @@
+You are an expert full-stack front-end engineer.
+ Goal: Build a pixel-perfect (≤ 2px diff) replica of the token discovery table UI from https://axiom.trade/pulse with all listed features. Deliver a Next.js 14 App Router app (TypeScript strict, Tailwind) using Redux Toolkit (complex state), React Query (data fetching), and Radix UI / shadcn/ui (accessible components). Include a mock REST API and a mock WebSocket server for real-time price updates.
+0) Output format
+Create a full project in Replit with clean, modular code and clear commit messages.
+
+
+After code generation, print:
+
+
+How to run locally (commands),
+
+
+How to deploy on Vercel,
+
+
+Where to find the YouTube demo checklist,
+
+
+How to run Lighthouse & visual-regression tests,
+
+
+Any environment variables used.
+
+
+1) Tech Stack & Quality Gates
+Framework: Next.js 14 App Router (/app), TypeScript ("strict": true), Tailwind CSS.
+
+
+State: Redux Toolkit (table view state, filters, pinned rows, UI prefs).
+
+
+Data: React Query (REST list + details, staleTime/cacheTime tuned).
+
+
+UI: shadcn/ui + Radix UI primitives (Tabs, Tooltip, Popover, Dialog/Sheet, HoverCard, ScrollArea, Dropdown menu).
+
+
+Animations: Framer Motion for subtle transitions; CSS transitions for price color changes.
+
+
+Accessibility: Keyboard navigable; roles/aria on custom components; focus traps in dialogs.
+
+
+Performance: No layout shifts (pre-set row heights, image sizes), memoized rows/cells, <100ms interaction budget, code-splitting, React.memo/useMemo/useCallback in critical paths, virtualized table (use @tanstack/react-virtual or react-virtualized).
+
+
+Lighthouse ≥ 90 (Mobile & Desktop). Add next/script for preconnects, font-display: swap, image optimization.
+
+
+Tests:
+
+
+Playwright visual-regression (toHaveScreenshot) with per-view snapshots (desktop 1440px, tablet 768px, mobile 320px). Threshold set to allow ≤ 2px diff.
+
+
+A few Vitest unit tests for helpers (sorting, formatting).
+
+
+CI: GitHub Actions to run lint, typecheck, unit tests, Playwright screenshots, and Lighthouse CI (budget config).
+
+
+2) Repository Structure (Atomic Architecture)
+.
+├─ app/
+│  ├─ layout.tsx
+│  ├─ page.tsx                        # /pulse clone landing showing the table
+│  ├─ pulse/
+│  │  ├─ page.tsx                    # route alias if needed
+│  ├─ api/
+│  │  ├─ tokens/route.ts             # REST: GET /api/tokens?tab=...
+│  │  ├─ tokens/[id]/route.ts        # REST: GET /api/tokens/:id (details)
+│  │  └─ sse/route.ts                # Edge SSE fallback for Vercel prod
+├─ packages/
+│  └─ ws-mock/                       # tiny Node WebSocket mock (dev only)
+├─ src/
+│  ├─ store/                         # Redux Toolkit slices
+│  │  ├─ index.ts
+│  │  ├─ uiSlice.ts
+│  │  └─ tableSlice.ts
+│  ├─ query/                         # React Query keys + hooks
+│  │  ├─ client.ts
+│  │  ├─ useTokens.ts
+│  │  └─ useTokenDetails.ts
+│  ├─ components/
+│  │  ├─ table/
+│  │  │  ├─ TokenTable.tsx           # virtualized, memoized, sticky header
+│  │  │  ├─ TokenRow.tsx
+│  │  │  ├─ cells/                   # atomic cell components
+│  │  │  │  ├─ PriceCell.tsx         # smooth color transitions (+/−)
+│  │  │  │  ├─ NameCell.tsx          # symbol, icon, subtext
+│  │  │  │  ├─ ChangeCell.tsx        # 24h/7d, arrows, color
+│  │  │  │  ├─ VolumeCell.tsx
+│  │  │  │  ├─ TagsCell.tsx          # popover with tag list
+│  │  │  │  └─ ActionCell.tsx        # kebab menu → modal/dialog
+│  │  ├─ ui/                         # shadcn wrapper components
+│  │  ├─ feedback/
+│  │  │  ├─ SkeletonRow.tsx          # shimmer, progressive loading
+│  │  │  ├─ ErrorBoundary.tsx
+│  │  │  └─ RetryButton.tsx
+│  │  ├─ toolbar/
+│  │  │  ├─ TableToolbar.tsx         # tabs: New pairs, Final Stretch, Migrated
+│  │  │  ├─ SearchBox.tsx
+│  │  │  ├─ SortMenu.tsx             # multi-column sort
+│  │  │  └─ DensityToggle.tsx        # row density (compact/comfortable)
+│  ├─ hooks/
+│  │  ├─ usePriceFeed.ts             # WebSocket + SSE fallback
+│  │  └─ useSmoothDeltaColor.ts      # price color fading hook
+│  ├─ utils/
+│  │  ├─ format.ts                   # number, currency, pct, compact
+│  │  ├─ sort.ts                     # stable multi-sort helpers
+│  │  ├─ comparePixels.ts            # helper for visual-reg threshold
+│  │  └─ constants.ts                # tab names, colors, feature flags
+│  ├─ styles/
+│  │  └─ globals.css
+├─ public/
+│  └─ icons/...
+├─ e2e/                              # Playwright tests + snapshots
+├─ lighthouse/
+│  └─ lighthouserc.json
+├─ README.md                         # design decisions + snapshots + video links
+├─ vercel.json
+├─ package.json
+├─ tailwind.config.ts
+├─ tsconfig.json
+└─ .github/workflows/ci.yml
+
+3) UI/UX Spec (match axiom.trade/pulse)
+Page header, pills/tabs: New pairs, Final Stretch, Migrated (active styles exactly matched).
+
+
+Token table with sticky header, zebra rows, hover highlight, and:
+
+
+Columns (at least): Rank, Token (icon + name + symbol), Price, 24h %, 7d %, Volume(24h), Market Cap, Tags/Status, Actions.
+
+
+Tooltips on truncated values.
+
+
+Popover for tags/status with mini definitions.
+
+
+Modal/Dialog for token details (chart placeholder + metadata).
+
+
+Sorting: multi-column (hold Shift to add), with indicators and direction toggles.
+
+
+Interactions:
+
+
+Row hover elevates background subtly.
+
+
+Clicking a token opens details modal.
+
+
+Real-time price updates via WebSocket mock:
+
+
+Color transition: fade green for upticks, red for downticks (CSS transitions ~600ms + easing).
+
+
+Loading:
+
+
+Skeleton rows (10–20) with shimmer on first load.
+
+
+Progressive loading (paginated or infinite scroll).
+
+
+Error boundary with retry.
+
+
+Responsiveness:
+
+
+Fully responsive down to 320px; at small screens collapse less-important columns behind a “More” disclosure or convert to 2-line rows.
+
+
+Ensure no CLS on data arrival.
+
+
+4) Data Model & Mock APIs
+REST:
+GET /api/tokens?tab=new|final|migrated&page=1&pageSize=50&sort=price:desc,change24h:desc&search=...
+
+
+Response shape:
+
+
+{
+  "data": [
+    {
+      "id": "btc",
+      "rank": 1,
+      "name": "Bitcoin",
+      "symbol": "BTC",
+      "icon": "/icons/btc.svg",
+      "price": 67432.15,
+      "change24h": 0.035,
+      "change7d": 0.072,
+      "volume24h": 34219876543,
+      "marketCap": 1289987654321,
+      "tags": ["blue-chip", "pow"],
+      "status": "new"    // or "final", "migrated"
+    }
+  ],
+  "page": 1,
+  "pageSize": 50,
+  "total": 1200
+}
+
+GET /api/tokens/:id returns details including a small synthetic timeseries for the modal.
+
+
+WebSocket mock (dev):
+A tiny Node server (packages/ws-mock) using ws at ws://localhost:3001.
+
+
+Every 1s, broadcast updates:
+
+
+{ "id": "btc", "price": 67450.42, "ts": 1731139200000 }
+
+Client hook usePriceFeed() merges updates into React Query cache + Redux view.
+
+
+SSE fallback (prod on Vercel):
+GET /api/sse as Edge runtime streaming random updates to simulate real-time.
+
+
+Sorting/Filtering:
+Implement server-like sorting in the REST handler to test client performance.
+
+
+Ensure deterministic stable sort (tie-break by id).
+
+
+5) Styling & Theming
+Use Tailwind with a light theme matching Axiom’s look (approx) and CSS variables for tones.
+
+
+Predefine tokens:
+
+
+Accent, hover, row zebra, border, gain/loss colors, subtle shadows.
+
+
+Exact spacing/typography to visually align (aim for pixel-perfection; we’ll verify via Playwright).
+
+
+6) Performance Requirements
+Virtualized rows for large lists (10k+ rows OK in dev).
+
+
+Memoized cells, avoid prop churn; selectors in Redux.
+
+
+Debounce search; throttled resize.
+
+
+Precompute formatted strings (number/currency/percentage) to avoid per-render work.
+
+
+No layout shifts—reserve space for changing values; animate color only.
+
+
+7) Loading Patterns
+First load: skeleton + shimmer.
+
+
+Progressive: fetch more on scroll; show skeleton placeholders while appending.
+
+
+Graceful error with Retry; exponential backoff for React Query.
+
+
+8) Accessibility
+Proper aria-sort on headers.
+
+
+Tooltip as Radix with focus/hover support.
+
+
+Dialog with focus trap and Esc close.
+
+
+Keyboard sortable headers and tabbable action menus.
+
+
+9) Testing & Tooling
+ESLint, Prettier, TypeScript strict, Husky pre-commit (lint + typecheck).
+
+
+Vitest unit tests for format/sort utilities.
+
+
+Playwright:
+
+
+Visual regression snapshots for desktop 1440, tablet 768, mobile 320.
+
+
+expect(page).toHaveScreenshot({ maxDiffPixels: 2 }).
+
+
+Scenarios: initial load (skeleton), loaded table, sorting changed, modal open, hover states.
+
+
+Lighthouse CI:
+
+
+Config with budgets to keep ≥ 90 on mobile & desktop.
+
+
+Fail CI if below thresholds.
+
+
+10) CI/CD & Deployment
+GitHub Actions workflow:
+
+
+pnpm install, pnpm typecheck, pnpm lint, pnpm test, pnpm test:e2e, pnpm lhci.
+
+
+Upload Playwright artifacts and Lighthouse reports.
+
+
+Vercel:
+
+
+vercel.json routing for /api/*, Edge on /api/sse.
+
+
+In production, auto-fallback to SSE if WebSocket host not available.
+
+
+Add README:
+
+
+Architecture diagram, file tree, reasoning for Redux vs React Query split.
+
+
+Auto-layout snapshots (include images from Playwright).
+
+
+Public YouTube video link placeholder + script checklist:
+
+
+Switch tabs (New/Final/Migrated),
+
+
+Sort multi-column,
+
+
+Search + debounce,
+
+
+Hover tooltip + tag popover,
+
+
+Open details modal,
+
+
+Real-time price update with smooth color fade,
+
+
+Loading skeleton & progressive append,
+
+
+Error boundary + retry,
+
+
+Responsive (resize to 320px).
+
+
+11) Implementation Notes (must do)
+Virtualized table using @tanstack/react-virtual.
+
+
+Price color transition: track previous value per row; apply class bg-[gain]/[loss] fade via CSS transition to transparent over ~600ms; don’t change layout/width.
+
+
+Redux vs React Query:
+
+
+React Query for remote server data & caching.
+
+
+Redux for local view state (sorts, filters, pinning, density).
+
+
+Tabs logic: route-synced query param (?tab=new|final|migrated).
+
+
+Sorting: hold Shift for multi-column; update Redux slice.
+
+
+Error boundary: capture errors in table subtree, show Retry to refetch.
+
+
+Strict typing: define DTOs, zod schema for safety (bonus).
+
+
+12) Scripts
+dev: concurrently start Next and ws-mock (ws://localhost:3001)
+
+
+build: next build
+
+
+start: next start (prod)
+
+
+test: vitest
+
+
+test:e2e: playwright test
+
+
+lhci: lighthouse-ci autorun
+
+
+13) Deliverables (print these at the end)
+GitHub repo with clean commits and CI passing.
+
+
+Vercel deployment URL (with SSE fallback).
+
+
+1–2 min YouTube video link demonstrating all checklist items.
+
+
+README with auto-layout snapshots and design decisions.
+
+
+Now generate the full project with all code, configs, tests, and docs exactly as specified above. Include realistic mock data and icons, and ensure the UI is pixel-tight and performant.
+
+
