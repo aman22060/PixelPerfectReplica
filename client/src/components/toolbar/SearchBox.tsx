@@ -15,13 +15,13 @@ export default function SearchBox({ value, onChange }: SearchBoxProps) {
     const timer = setTimeout(() => {
       onChange(localValue);
     }, 300);
-
     return () => clearTimeout(timer);
   }, [localValue, onChange]);
 
   return (
-    <div className="relative w-64">
-      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+    <div className="relative w-64 flex items-center">
+      <Search className="absolute left-3 w-4 h-4 text-muted-foreground pointer-events-none" />
+
       <Input
         type="search"
         placeholder="Search tokens..."
@@ -34,7 +34,7 @@ export default function SearchBox({ value, onChange }: SearchBoxProps) {
         <Button
           size="icon"
           variant="ghost"
-          className="absolute right-1 top-1/2 -translate-y-1/2 w-6 h-6"
+          className="absolute right-2 top-1/2 -translate-y-1/2 w-6 h-6 p-0 flex items-center justify-center"
           onClick={() => {
             setLocalValue('');
             onChange('');

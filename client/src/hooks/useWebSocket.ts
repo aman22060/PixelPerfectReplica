@@ -1,68 +1,77 @@
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef, useCallback } from "react";
 
-interface PriceUpdate {
+type PriceUpdate = {
   id: string;
   price: number;
   timestamp: number;
-}
+};
 
-interface UseWebSocketProps {
+type UseWebSocketProps = {
   onPriceUpdate: (update: PriceUpdate) => void;
   enabled?: boolean;
-}
+};
 
 export function useWebSocket({ onPriceUpdate, enabled = true }: UseWebSocketProps) {
   const wsRef = useRef<WebSocket | null>(null);
-  const reconnectTimeoutRef = useRef<NodeJS.Timeout>();
+  // Important: use ReturnType<typeof setTimeout> in browser (not NodeJS.Timeout)
+  const reconnectRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const connect = useCallback(() => {
     if (!enabled) return;
 
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${protocol}//${window.location.host}/ws`;
+    // Avoid duplicate connections if one is OPEN / CONNECTING
+    if (wsRef.current && wsRef.current.readyState !== WebSocket.CLOSED) return;
+
+    const { protocol, host } = window.location; // 'host' includes port
+    const wsProto = protocol === "https:" ? "wss:" : "ws:";
+    const url = `${wsProto}//${host}/ws`;
 
     try {
-      const ws = new WebSocket(wsUrl);
+      const ws = new WebSocket(url);
 
       ws.onopen = () => {
-        console.log('WebSocket connected');
+        // connected
       };
 
-      ws.onmessage = (event) => {
+      ws.onmessage = (e) => {
         try {
-          const update: PriceUpdate = JSON.parse(event.data);
-          onPriceUpdate(update);
-        } catch (error) {
-          console.error('Failed to parse WebSocket message:', error);
+          const msg = JSON.parse(e.data) as PriceUpdate;
+          onPriceUpdate(msg);
+        } catch (err) {
+          // swallow malformed messages to keep the socket alive
+          console.error("WS parse error:", err);
         }
       };
 
-      ws.onerror = (error) => {
-        console.error('WebSocket error:', error);
+      ws.onerror = (err) => {
+        console.error("WebSocket error:", err);
       };
 
       ws.onclose = () => {
-        console.log('WebSocket disconnected, reconnecting in 5s...');
-        reconnectTimeoutRef.current = setTimeout(connect, 5000);
+        if (reconnectRef.current) clearTimeout(reconnectRef.current);
+        reconnectRef.current = setTimeout(() => {
+          wsRef.current = null;
+          connect();
+        }, 5000);
       };
 
       wsRef.current = ws;
-    } catch (error) {
-      console.error('Failed to create WebSocket:', error);
-      reconnectTimeoutRef.current = setTimeout(connect, 5000);
+    } catch (err) {
+      console.error("WebSocket create error:", err);
+      if (reconnectRef.current) clearTimeout(reconnectRef.current);
+      reconnectRef.current = setTimeout(() => {
+        wsRef.current = null;
+        connect();
+      }, 5000);
     }
   }, [enabled, onPriceUpdate]);
 
   useEffect(() => {
     connect();
-
     return () => {
-      if (reconnectTimeoutRef.current) {
-        clearTimeout(reconnectTimeoutRef.current);
-      }
-      if (wsRef.current) {
-        wsRef.current.close();
-      }
+      if (reconnectRef.current) clearTimeout(reconnectRef.current);
+      if (wsRef.current) wsRef.current.close();
+      wsRef.current = null;
     };
   }, [connect]);
 

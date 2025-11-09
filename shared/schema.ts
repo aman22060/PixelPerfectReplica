@@ -1,7 +1,15 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, integer, numeric, timestamp } from "drizzle-orm/pg-core";
+import {
+  pgTable,
+  text,
+  varchar,
+  integer,
+  numeric,
+  timestamp,
+} from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
+
 
 export const tokens = pgTable("tokens", {
   id: varchar("id").primaryKey(),
@@ -26,8 +34,30 @@ export const insertTokenSchema = createInsertSchema(tokens).omit({
   updatedAt: true,
 });
 
+
+export const createTokenInputSchema = z.object({
+  id: z.string(),
+  rank: z.coerce.number().int().nonnegative(),
+  name: z.string().min(1),
+  symbol: z.string().min(1),
+  icon: z.string().min(1),
+  price: z.coerce.number(),
+  change24h: z.coerce.number(),
+  change7d: z.coerce.number(),
+  volume24h: z.coerce.number(),
+  marketCap: z.coerce.number(),
+  tags: z.array(z.string()).optional().default([]),
+  status: z.enum(["new", "final", "migrated"]).optional().default("new"),
+  description: z.string().optional(),
+  website: z.string().url().optional(),
+  twitter: z.string().url().optional(),
+});
+
+
 export type InsertToken = z.infer<typeof insertTokenSchema>;
+export type CreateTokenInput = z.infer<typeof createTokenInputSchema>;
 export type Token = typeof tokens.$inferSelect;
+
 
 export const tokenSchema = z.object({
   id: z.string(),
@@ -48,10 +78,15 @@ export const tokenDetailSchema = tokenSchema.extend({
   description: z.string().optional(),
   website: z.string().optional(),
   twitter: z.string().optional(),
-  priceHistory: z.array(z.object({
-    timestamp: z.number(),
-    price: z.number(),
-  })),
+  priceHistory: z
+    .array(
+      z.object({
+        timestamp: z.number(),
+        price: z.number(),
+      })
+    )
+    .optional()
+    .default([]),
 });
 
 export type TokenDetail = z.infer<typeof tokenDetailSchema>;
@@ -67,7 +102,13 @@ export type TokensResponse = z.infer<typeof tokensResponseSchema>;
 
 export type TabType = "new" | "final" | "migrated";
 
-export type SortColumn = "rank" | "price" | "change24h" | "change7d" | "volume24h" | "marketCap";
+export type SortColumn =
+  | "rank"
+  | "price"
+  | "change24h"
+  | "change7d"
+  | "volume24h"
+  | "marketCap";
 export type SortDirection = "asc" | "desc";
 
 export interface SortConfig {

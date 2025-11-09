@@ -1,6 +1,13 @@
+# .gitignore
 node_modules
 dist
+dist-ssr
+build
+.env
+.env.*
 .DS_Store
-server/public
-vite.config.ts.*
-*.tar.gz
+*.log
+*.zip
+*.tar
+.vscode/
+.idea/

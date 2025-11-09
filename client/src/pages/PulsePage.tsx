@@ -14,11 +14,23 @@ import SearchBox from '@/components/toolbar/SearchBox';
 import DensityToggle from '@/components/toolbar/DensityToggle';
 import TokenDetailModal from '@/components/modals/TokenDetailModal';
 import ThemeToggle from '@/components/ThemeToggle';
-import type { SortColumn, SortDirection } from '@shared/schema';
+import type { SortColumn, SortDirection, Token } from '@shared/schema';
 import { useTokens } from '@/hooks/useTokens';
 import { useTokenDetail } from '@/hooks/useTokenDetail';
 import { useWebSocket } from '@/hooks/useWebSocket';
 import { queryClient } from '@/lib/queryClient';
+
+type Flash = 'gain' | 'loss';
+
+type TokensResponseUI = {
+  items: any[];
+  page: number;
+  pageSize: number;
+  total: number;
+};
+
+const toStringNum = (v: unknown) =>
+  typeof v === 'string' ? v : String(v ?? '0');
 
 export default function PulsePage() {
   const dispatch = useDispatch();
@@ -29,37 +41,42 @@ export default function PulsePage() {
     (state: RootState) => state.ui
   );
 
-  const [priceFlashes, setPriceFlashes] = useState<Map<string, 'gain' | 'loss'>>(new Map());
+  const [priceFlashes, setPriceFlashes] = useState<Map<string, Flash>>(new Map());
+
+  const uiTab = activeTab === 'final' ? 'final-stretch' : activeTab;
 
   const { data: tokensData, isLoading } = useTokens({
-    tab: activeTab,
+    tab: uiTab as any,          
     page: 1,
     pageSize: 50,
     search: searchQuery,
     sort: sortConfigs,
   });
 
-  const { data: tokenDetail } = useTokenDetail(selectedTokenId);
+
+  const { data: tokenDetail } = useTokenDetail(selectedTokenId || undefined);
 
   useWebSocket({
     onPriceUpdate: useCallback((update) => {
+   
       queryClient.setQueryData(
-        ['/api/tokens', activeTab, 1, 50, searchQuery, sortConfigs],
-        (old: any) => {
-          if (!old) return old;
-          
-          const tokenIndex = old.data.findIndex((t: any) => t.id === update.id);
-          if (tokenIndex === -1) return old;
-          
-          const token = old.data[tokenIndex];
-          const isGain = update.price > token.price;
-          
+        ['/api/tokens', uiTab, 1, 50, searchQuery, sortConfigs],
+        (old: TokensResponseUI | undefined) => {
+          if (!old || !Array.isArray(old.items)) return old;
+
+          const idx = old.items.findIndex((t: any) => t.id === update.id);
+          if (idx === -1) return old;
+
+          const curr = old.items[idx];
+          const currPriceNum = Number(curr.price ?? 0);
+          const isGain = Number(update.price) > currPriceNum;
+
+     
           setPriceFlashes(prev => {
             const next = new Map(prev);
             next.set(update.id, isGain ? 'gain' : 'loss');
             return next;
           });
-          
           setTimeout(() => {
             setPriceFlashes(prev => {
               const next = new Map(prev);
@@ -67,18 +84,40 @@ export default function PulsePage() {
               return next;
             });
           }, 600);
-          
-          const newData = [...old.data];
-          newData[tokenIndex] = { ...token, price: update.price };
-          
-          return { ...old, data: newData };
+
+          const newItems = [...old.items];
+    
+          newItems[idx] = { ...curr, price: String(update.price) };
+
+          return { ...old, items: newItems };
         }
       );
-    }, [activeTab, searchQuery, sortConfigs]),
+    }, [uiTab, searchQuery, sortConfigs]),
     enabled: true,
   });
 
-  const tokens = useMemo(() => tokensData?.data || [], [tokensData]);
+
+  const tokens = useMemo<Token[]>(() => {
+    const src = tokensData?.items || [];
+    return src.map((t: any) => ({
+      symbol: String(t.symbol ?? ''),
+      id: String(t.id ?? ''),
+      rank: Number(t.rank ?? 0),
+      name: String(t.name ?? ''),
+      icon: String(t.icon ?? ''),
+      price: toStringNum(t.price),
+      change24h: toStringNum(t.change24h),
+      change7d: toStringNum(t.change7d),
+      volume24h: toStringNum(t.volume24h),
+      marketCap: toStringNum(t.marketCap),
+      tags: Array.isArray(t.tags) ? t.tags : [],
+      status: (t.status === 'final-stretch' ? 'final' : t.status) ?? 'new',
+      description: t.description ?? null,
+      website: t.website ?? null,
+      twitter: t.twitter ?? null,
+      updatedAt: t.updatedAt instanceof Date ? t.updatedAt : new Date(),
+    }));
+  }, [tokensData]);
 
   const handleSort = useCallback((column: SortColumn, shiftKey: boolean) => {
     if (shiftKey) {

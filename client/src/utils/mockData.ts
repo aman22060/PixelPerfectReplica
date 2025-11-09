@@ -1,4 +1,3 @@
-//todo: remove mock functionality
 import type { Token, TokenDetail } from '@shared/schema';
 
 const cryptoNames = [
@@ -37,40 +36,72 @@ const tags = [
   ['privacy'],
 ];
 
+const toStr = (n: number) => String(n);
+
 export function generateMockTokens(count: number, status: 'new' | 'final' | 'migrated'): Token[] {
+  const now = new Date();
   return Array.from({ length: count }, (_, i) => {
     const crypto = cryptoNames[i % cryptoNames.length];
-    const basePrice = Math.random() * 50000 + 100;
-    
+    const basePriceNum = Math.random() * 50000 + 100;
+    const change24hNum = (Math.random() - 0.5) * 0.2;
+    const change7dNum = (Math.random() - 0.5) * 0.4;
+    const volumeNum = Math.random() * 10_000_000_000 + 1_000_000;
+    const mcapNum = basePriceNum * (Math.random() * 1_000_000_000 + 10_000_000);
+
+    const id = `${crypto.symbol.toLowerCase()}-${status}-${i}`;
+
     return {
-      id: `${crypto.symbol.toLowerCase()}-${status}-${i}`,
+      id,
       rank: i + 1,
       name: crypto.name,
       symbol: crypto.symbol,
       icon: `https://api.dicebear.com/7.x/shapes/svg?seed=${crypto.symbol}`,
-      price: basePrice,
-      change24h: (Math.random() - 0.5) * 0.2,
-      change7d: (Math.random() - 0.5) * 0.4,
-      volume24h: Math.random() * 10_000_000_000 + 1_000_000,
-      marketCap: basePrice * (Math.random() * 1_000_000_000 + 10_000_000),
+      price: toStr(Number(basePriceNum.toFixed(6))),               
+      change24h: toStr(Number(change24hNum.toFixed(6))),           
+      change7d: toStr(Number(change7dNum.toFixed(6))),             
+      volume24h: toStr(Math.round(volumeNum)),                     
+      marketCap: toStr(Math.round(mcapNum)),                       
       tags: tags[i % tags.length],
-      status,
+      status, 
+      description: `${crypto.name} is a decentralized cryptocurrency that aims to revolutionize the blockchain industry.`,
+      website: `https://${crypto.symbol.toLowerCase()}.org`,
+      twitter: `@${crypto.symbol.toLowerCase()}`,
+      updatedAt: now,
     };
   });
 }
 
 export function generateMockTokenDetail(token: Token): TokenDetail {
   const now = Date.now();
+
+
+  const priceNum     = Number(token.price ?? 0);
+  const change24hNum = Number(token.change24h ?? 0);
+  const change7dNum  = Number(token.change7d ?? 0);
+  const volumeNum    = Number(token.volume24h ?? 0);
+  const mcapNum      = Number(token.marketCap ?? 0);
+
   const priceHistory = Array.from({ length: 24 }, (_, i) => ({
     timestamp: now - (23 - i) * 3600000,
-    price: token.price * (1 + (Math.random() - 0.5) * 0.1),
+    price: Number((priceNum * (1 + (Math.random() - 0.5) * 0.1)).toFixed(6)),
   }));
 
   return {
-    ...token,
-    description: `${token.name} is a decentralized cryptocurrency that aims to revolutionize the blockchain industry.`,
-    website: `https://${token.symbol.toLowerCase()}.org`,
-    twitter: `@${token.symbol.toLowerCase()}`,
-    priceHistory,
+    symbol: token.symbol,
+    id: token.id,
+    rank: token.rank,
+    name: token.name,
+    icon: token.icon,
+    price: priceNum,             
+    change24h: change24hNum,     
+    change7d: change7dNum,       
+    volume24h: volumeNum,        
+    marketCap: mcapNum,          
+    tags: token.tags ?? [],
+    status: token.status,
+    priceHistory,                
+    description: token.description ?? undefined,
+    website: token.website ?? undefined,
+    twitter: token.twitter ?? undefined,
   };
 }
