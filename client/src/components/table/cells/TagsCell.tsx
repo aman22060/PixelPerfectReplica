@@ -23,9 +23,12 @@ export default function TagsCell({ tags }: TagsCellProps) {
       {remainingCount > 0 && (
         <Popover>
           <PopoverTrigger asChild>
-            <Badge variant="outline" className="text-xs cursor-pointer hover-elevate" data-testid="button-more-tags">
+            <button 
+              className="inline-flex items-center rounded-md border border-input bg-background px-2 py-1 text-xs font-semibold transition-colors hover-elevate cursor-pointer" 
+              data-testid="button-more-tags"
+            >
               +{remainingCount}
-            </Badge>
+            </button>
           </PopoverTrigger>
           <PopoverContent className="w-48" align="start">
             <div className="space-y-2">

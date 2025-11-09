@@ -8,12 +8,12 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ExternalLink, Twitter } from 'lucide-react';
-import type { Token } from '@shared/schema';
-import { formatCurrency, formatPercentage } from '@/utils/format';
+import type { TokenDetail } from '@shared/schema';
+import { formatCurrency } from '@/utils/format';
 import ChangeCell from '../table/cells/ChangeCell';
 
 interface TokenDetailModalProps {
-  token: Token | null;
+  token: TokenDetail | null;
   open: boolean;
   onClose: () => void;
 }
@@ -77,23 +77,36 @@ export default function TokenDetailModal({ token, open, onClose }: TokenDetailMo
             <p className="text-muted-foreground">Price chart placeholder</p>
           </div>
 
-          <div>
-            <h3 className="font-semibold mb-2">About {token.name}</h3>
-            <p className="text-sm text-muted-foreground">
-              {token.name} is a decentralized cryptocurrency that aims to revolutionize the blockchain industry
-              with innovative technology and strong community support.
-            </p>
-          </div>
+          {token.description && (
+            <div>
+              <h3 className="font-semibold mb-2">About {token.name}</h3>
+              <p className="text-sm text-muted-foreground">
+                {token.description}
+              </p>
+            </div>
+          )}
 
           <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={() => console.log('Visit website')}>
-              <ExternalLink className="w-4 h-4 mr-2" />
-              Website
-            </Button>
-            <Button variant="outline" size="sm" onClick={() => console.log('Visit Twitter')}>
-              <Twitter className="w-4 h-4 mr-2" />
-              Twitter
-            </Button>
+            {token.website && (
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => window.open(token.website, '_blank')}
+              >
+                <ExternalLink className="w-4 h-4 mr-2" />
+                Website
+              </Button>
+            )}
+            {token.twitter && (
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => window.open(`https://twitter.com/${token.twitter}`, '_blank')}
+              >
+                <Twitter className="w-4 h-4 mr-2" />
+                Twitter
+              </Button>
+            )}
           </div>
         </div>
       </DialogContent>

@@ -1,4 +1,33 @@
+import { sql } from "drizzle-orm";
+import { pgTable, text, varchar, integer, numeric, timestamp } from "drizzle-orm/pg-core";
+import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
+
+export const tokens = pgTable("tokens", {
+  id: varchar("id").primaryKey(),
+  rank: integer("rank").notNull(),
+  name: text("name").notNull(),
+  symbol: text("symbol").notNull(),
+  icon: text("icon").notNull(),
+  price: numeric("price", { precision: 20, scale: 8 }).notNull(),
+  change24h: numeric("change24h", { precision: 10, scale: 6 }).notNull(),
+  change7d: numeric("change7d", { precision: 10, scale: 6 }).notNull(),
+  volume24h: numeric("volume24h", { precision: 20, scale: 2 }).notNull(),
+  marketCap: numeric("market_cap", { precision: 20, scale: 2 }).notNull(),
+  tags: text("tags").array().notNull().default(sql`ARRAY[]::text[]`),
+  status: text("status").notNull().$type<"new" | "final" | "migrated">(),
+  description: text("description"),
+  website: text("website"),
+  twitter: text("twitter"),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertTokenSchema = createInsertSchema(tokens).omit({
+  updatedAt: true,
+});
+
+export type InsertToken = z.infer<typeof insertTokenSchema>;
+export type Token = typeof tokens.$inferSelect;
 
 export const tokenSchema = z.object({
   id: z.string(),
@@ -14,8 +43,6 @@ export const tokenSchema = z.object({
   tags: z.array(z.string()),
   status: z.enum(["new", "final", "migrated"]),
 });
-
-export type Token = z.infer<typeof tokenSchema>;
 
 export const tokenDetailSchema = tokenSchema.extend({
   description: z.string().optional(),

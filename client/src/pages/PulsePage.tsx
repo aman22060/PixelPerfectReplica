@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import type { RootState } from '@/store';
 import {
@@ -14,10 +14,11 @@ import SearchBox from '@/components/toolbar/SearchBox';
 import DensityToggle from '@/components/toolbar/DensityToggle';
 import TokenDetailModal from '@/components/modals/TokenDetailModal';
 import ThemeToggle from '@/components/ThemeToggle';
-import type { SortColumn, SortDirection, Token } from '@shared/schema';
-import { generateMockTokens } from '@/utils/mockData';
-import { usePriceUpdates } from '@/hooks/usePriceUpdates';
-import { useMemo } from 'react';
+import type { SortColumn, SortDirection } from '@shared/schema';
+import { useTokens } from '@/hooks/useTokens';
+import { useTokenDetail } from '@/hooks/useTokenDetail';
+import { useWebSocket } from '@/hooks/useWebSocket';
+import { queryClient } from '@/lib/queryClient';
 
 export default function PulsePage() {
   const dispatch = useDispatch();
@@ -28,19 +29,56 @@ export default function PulsePage() {
     (state: RootState) => state.ui
   );
 
-  //todo: remove mock functionality
-  const [mockTokens] = useState(() => generateMockTokens(50, activeTab));
-  const { tokens: liveTokens, priceFlashes } = usePriceUpdates(mockTokens);
+  const [priceFlashes, setPriceFlashes] = useState<Map<string, 'gain' | 'loss'>>(new Map());
 
-  const filteredTokens = useMemo(() => {
-    if (!searchQuery) return liveTokens;
-    const query = searchQuery.toLowerCase();
-    return liveTokens.filter(
-      (token) =>
-        token.name.toLowerCase().includes(query) ||
-        token.symbol.toLowerCase().includes(query)
-    );
-  }, [liveTokens, searchQuery]);
+  const { data: tokensData, isLoading } = useTokens({
+    tab: activeTab,
+    page: 1,
+    pageSize: 50,
+    search: searchQuery,
+    sort: sortConfigs,
+  });
+
+  const { data: tokenDetail } = useTokenDetail(selectedTokenId);
+
+  useWebSocket({
+    onPriceUpdate: useCallback((update) => {
+      queryClient.setQueryData(
+        ['/api/tokens', activeTab, 1, 50, searchQuery, sortConfigs],
+        (old: any) => {
+          if (!old) return old;
+          
+          const tokenIndex = old.data.findIndex((t: any) => t.id === update.id);
+          if (tokenIndex === -1) return old;
+          
+          const token = old.data[tokenIndex];
+          const isGain = update.price > token.price;
+          
+          setPriceFlashes(prev => {
+            const next = new Map(prev);
+            next.set(update.id, isGain ? 'gain' : 'loss');
+            return next;
+          });
+          
+          setTimeout(() => {
+            setPriceFlashes(prev => {
+              const next = new Map(prev);
+              next.delete(update.id);
+              return next;
+            });
+          }, 600);
+          
+          const newData = [...old.data];
+          newData[tokenIndex] = { ...token, price: update.price };
+          
+          return { ...old, data: newData };
+        }
+      );
+    }, [activeTab, searchQuery, sortConfigs]),
+    enabled: true,
+  });
+
+  const tokens = useMemo(() => tokensData?.data || [], [tokensData]);
 
   const handleSort = useCallback((column: SortColumn, shiftKey: boolean) => {
     if (shiftKey) {
@@ -59,8 +97,6 @@ export default function PulsePage() {
       }]));
     }
   }, [dispatch, sortConfigs]);
-
-  const selectedToken = liveTokens.find((t) => t.id === selectedTokenId) || null;
 
   return (
     <div className="flex flex-col h-screen">
@@ -92,7 +128,8 @@ export default function PulsePage() {
 
       <main className="flex-1 overflow-hidden">
         <TokenTable
-          tokens={filteredTokens}
+          tokens={tokens}
+          isLoading={isLoading}
           pinnedTokenIds={pinnedTokenIds}
           onTogglePin={(id) => dispatch(togglePinToken(id))}
           onTokenClick={(token) => dispatch(setSelectedTokenId(token.id))}
@@ -104,7 +141,7 @@ export default function PulsePage() {
       </main>
 
       <TokenDetailModal
-        token={selectedToken}
+        token={tokenDetail || null}
         open={!!selectedTokenId}
         onClose={() => dispatch(setSelectedTokenId(null))}
       />
